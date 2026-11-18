@@ -1,5 +1,6 @@
 package com.astra.view;
 
+import com.astra.controller.SpawnController;
 import com.astra.command.CommandBus;
 import com.astra.command.Commands;
 import com.astra.core.SimulationControl;
@@ -56,6 +57,7 @@ public final class ControlPanel extends VBox {
     private static final double SPEED_STEP = 2;
 
     private final CommandBus bus;
+    private final SpawnController spawnController;
     private final Supplier<WorldSnapshot> snapshots;
     private final Button pauseButton = new Button("Pausar");
     private final Button stepButton = new Button("Paso");
@@ -78,6 +80,7 @@ public final class ControlPanel extends VBox {
 
     public ControlPanel(CommandBus bus, Supplier<WorldSnapshot> snapshots, List<String> intersectionIds) {
         this.bus = Objects.requireNonNull(bus, "bus");
+        this.spawnController = new SpawnController(bus);
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         getStyleClass().addAll("panel", "control-panel");
 
@@ -282,9 +285,7 @@ public final class ControlPanel extends VBox {
     }
 
     private void spawn(int count) {
-        for (int i = 0; i < count; i++) {
-            bus.submit(Commands.spawn(kindChoice.getValue(), strategyChoice.getValue()));
-        }
+        spawnController.request(kindChoice.getValue(), strategyChoice.getValue(), count);
     }
 
     private void forceGreen(Axis axis) {
