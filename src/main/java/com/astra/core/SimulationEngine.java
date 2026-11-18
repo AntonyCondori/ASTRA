@@ -5,12 +5,14 @@ import com.astra.graph.RoadGraph;
 import com.astra.traffic.LightController;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * Bucle de paso fijo en el hilo {@code astra-engine}: ejecuta los comandos pendientes, genera vehículos, actualiza
@@ -32,6 +34,29 @@ public final class SimulationEngine {
     private final long tickMillis;
     private final double dtSeconds;
     private final AtomicReference<WorldSnapshot> latest = new AtomicReference<>(WorldSnapshot.EMPTY);
+
+    private final CopyOnWriteArrayList<Consumer<WorldSnapshot>> observers = new CopyOnWriteArrayList<>();
+
+    /** El motor llama a cada observador en su hilo al publicar un snapshot. */
+    public void addSnapshotObserver(Consumer<WorldSnapshot> observer) {
+        observers.addIfAbsent(Objects.requireNonNull(observer));
+    }
+
+    public void removeSnapshotObserver(Consumer<WorldSnapshot> observer) {
+        observers.remove(observer);
+    }
+
+    private void publish(WorldSnapshot snapshot) {
+        latest.set(snapshot);
+        for (var observer : observers) {
+            try {
+                observer.accept(snapshot);
+            } catch (RuntimeException ex) {
+                System.getLogger(SimulationEngine.class.getName()).log(System.Logger.Level.WARNING,
+                        "Snapshot observer failed", ex);
+            }
+        }
+    }
 
     // Guardados por el monitor de this; volatile para que isRunning() no necesite el lock que stop() retiene.
     private volatile ScheduledExecutorService executor;
@@ -191,13 +216,13 @@ public final class SimulationEngine {
         double speed = control.speedFactor();
         if (paused && !control.tryConsumeStep()) {
             tick++;
-            latest.set(world.toSnapshot(tick, simTimeSeconds, true, speed));
+            publish(world.toSnapshot(tick, simTimeSeconds, true, speed));
             return;
         }
         double dt = dtSeconds * speed;
         world.update(dt);
         tick++;
         simTimeSeconds += dt;
-        latest.set(world.toSnapshot(tick, simTimeSeconds, paused, speed));
+        publish(world.toSnapshot(tick, simTimeSeconds, paused, speed));
     }
 }
