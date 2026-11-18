@@ -5,10 +5,16 @@ import com.astra.graph.Intersection;
 import com.astra.graph.Road;
 import com.astra.routing.RouteStrategy;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /** Crea vehículos con la especificación de su tipo y la ruta inicial calculada por su estrategia. */
 public final class VehicleFactory {
+
+    private static final Map<VehicleKind, VehicleCreator> CREATORS = Map.of(
+            VehicleKind.CAR, new CarCreator(),
+            VehicleKind.BUS, new BusCreator(),
+            VehicleKind.AMBULANCE, new AmbulanceCreator());
 
     private final VehicleSpecs specs;
 
@@ -47,11 +53,7 @@ public final class VehicleFactory {
         Intersection origin = route.get(0).from();
         Intersection dest = route.get(route.size() - 1).to();
         VehicleSpec spec = specs.specFor(kind);
-        Vehicle vehicle = switch (kind) {
-            case CAR -> new Car(spec, strategy, origin, dest);
-            case BUS -> new Bus(spec, strategy, origin, dest);
-            case AMBULANCE -> new Ambulance(spec, strategy, origin, dest);
-        };
+        Vehicle vehicle = CREATORS.get(kind).create(spec, strategy, origin, dest);
         vehicle.assignRoute(route);
         return vehicle;
     }
