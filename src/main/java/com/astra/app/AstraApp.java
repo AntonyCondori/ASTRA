@@ -7,6 +7,7 @@ import com.astra.core.SimConfig;
 import com.astra.core.SimulationControl;
 import com.astra.core.SimulationEngine;
 import com.astra.core.VehicleSpawner;
+import com.astra.core.WorldSnapshot;
 import com.astra.core.WorldState;
 import com.astra.graph.Intersection;
 import com.astra.traffic.LightController;
@@ -17,6 +18,7 @@ import com.astra.view.ControlPanel;
 import com.astra.view.StatsPanel;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.layout.BorderPane;
@@ -55,7 +57,9 @@ public final class AstraApp extends Application {
                 .toList();
         renderer = new CityRenderer(map.graph(), engine::latestSnapshot, bus);
         controlPanel = new ControlPanel(bus, engine::latestSnapshot, lightIds);
-        statsPanel = new StatsPanel(engine::latestSnapshot);
+        var statisticsSnapshot = new AtomicReference<>(WorldSnapshot.EMPTY);
+        engine.addSnapshotObserver(statisticsSnapshot::set);
+        statsPanel = new StatsPanel(statisticsSnapshot::get);
         renderer.setOnIntersectionSelected(controlPanel::selectIntersection);
         controlPanel.setOnIntersectionChosen(renderer::select);
         if (!lightIds.isEmpty()) {
